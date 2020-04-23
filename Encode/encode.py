@@ -13,6 +13,13 @@ quantification_table = np.array(
      [72, 92, 95, 98, 112, 100, 103, 99]
      ])
 
+# 保存原图数据的变量
+picture = np.empty([512, 512], dtype=np.uint8)
+# 保存处理后的图片的变量
+processed_picture = np.empty([512, 512], dtype=np.uint8)
+# 保存量化后的图像
+quantified_blocks = np.empty([4096, 8, 8], dtype=np.float)
+
 
 # 处理图像
 def process(image):
@@ -54,10 +61,14 @@ def reverse_zigzag_scan(chain, num):
     return original_block
 
 
-def encode(filename: str):
+def encode(filename: str, k, quantification_on):
+    # 保存原始图片信息
+    global picture, quantified_blocks
     # 读取图片
     lena = np.fromfile(filename, dtype=np.uint8)
     # print(lena)
+    picture = np.reshape(lena, (512, 512))
+    print(picture)
     # 记录图片边长
     length = int(np.sqrt(lena.shape[0]))
     image = np.empty([length, length], dtype=np.uint8)
@@ -79,7 +90,11 @@ def encode(filename: str):
     for i in range(blocks.shape[0]):
         blocks[i] = cv2.dct(blocks[i])
         # 量化
-        blocks[i] = blocks[i] / quantification_table
+        if quantification_on:
+            blocks[i] = blocks[i] / (k * quantification_table)
+    blocks = np.around(blocks, decimals=0)
+    # 将预处理后的 blocks 保存
+    quantified_blocks = blocks
     # 用与保存数据序列
     chains = np.empty([int(length * length / 64), 64], dtype=np.float)
     # 将 Z 形扫描后的顺序填充进去
@@ -88,15 +103,28 @@ def encode(filename: str):
     return chains
 
 
-def decode(chains, num):
+def decode(chains, num, keep_whole_blocks, k, quantification_on):
+    """
+    解码端
+    :param chains:
+    :param num:
+    :param keep_whole_blocks:
+    :param k:
+    :return:
+    """
+    global quantified_blocks
     # Debug
     blocks = np.empty([chains.shape[0], 8, 8], dtype=np.float)
     for i in range(0, chains.shape[0]):
         blocks[i] = reverse_zigzag_scan(chains[i], num)
+    # 如果是保留所有信息
+    if keep_whole_blocks:
+        blocks = quantified_blocks
     # 还原 DCT 变换
     for i in range(blocks.shape[0]):
         # 反量化
-        blocks[i] = blocks[i] * quantification_table
+        if quantification_on:
+            blocks[i] = blocks[i] * quantification_table * k
         blocks[i] = cv2.idct(blocks[i])
     # + 128
     for i in range(blocks.shape[2]):
@@ -110,14 +138,22 @@ def decode(chains, num):
     print(original_pic)
     cv2.imshow('src', original_pic)
     cv2.waitKey()
+    return original_pic
 
 
 def calculate_psnr(original_pic, processed_pic):
+    """
+    计算 PSNR
+    :param original_pic: 原图
+    :param processed_pic: 解码后的图片
+    :return: PSNR 值
+    """
     tmp = (original_pic / 255.0 - processed_pic / 255.0) ** 2
     mean_pic = np.mean(tmp)
     return 20 * math.log10(1 / math.sqrt(mean_pic))
 
 
 if __name__ == '__main__':
-    chain = encode('lena.raw')
-    decode(chain, 8)
+    chain = encode('lena.raw', 14, True)
+    original_pic = decode(chain, 8, True, 14, True)
+    print(calculate_psnr(picture, original_pic))
