@@ -62,6 +62,13 @@ def reverse_zigzag_scan(chain, num):
 
 
 def encode(filename: str, k, quantification_on):
+    """
+    编码端
+    :param filename: 要编码的文件名
+    :param k: 量化系数
+    :param quantification_on: 是否量化（若为 False，则参数 k 无意义）
+    :return: Z 形扫描结果
+    """
     # 保存原始图片信息
     global picture, quantified_blocks
     # 读取图片
@@ -106,11 +113,12 @@ def encode(filename: str, k, quantification_on):
 def decode(chains, num, keep_whole_blocks, k, quantification_on):
     """
     解码端
-    :param chains:
-    :param num:
-    :param keep_whole_blocks:
-    :param k:
-    :return:
+    :param chains: 编码端输入的 Z 形扫描结果
+    :param num: 该 Z 形扫描保留的位数
+    :param keep_whole_blocks: 是否保留 Z 形扫描所有位数（若为 True，则参数 num 无意义）
+    :param k: 量化系数
+    :param quantification_on: 是否量化（若为 False，则参数 k 无意义）
+    :return: 解码图片结果
     """
     global quantified_blocks
     # Debug
